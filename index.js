@@ -81,28 +81,57 @@ app.post("/tasks", async (req, res) => {
 });
 
 // PUT /tasks/:id - Update a task's status
-app.put("/tasks/:id", (request, response) => {
-  const taskId = parseInt(request.params.id, 10);
-  const { status } = request.body;
-  const task = tasks.find((t) => t.id === taskId);
+app.put("/tasks/:id", async (req, res) => {
+  const taskId = parseInt(req.params.id, 10);
+  const { status } = req.body;
 
-  if (!task) {
-    return response.status(404).json({ error: "Task not found" });
+  if (!status) {
+    return res.status(400).json({ error: "Status is required" });
   }
-  task.status = status;
-  response.json({ message: "Task updated successfully" });
+
+  try {
+    const updateQuery = `
+        UPDATE tasks
+        SET status = $1
+        WHERE id = $2
+        RETURNING *;
+      `;
+    const values = [status, taskId];
+    const result = await pool.query(updateQuery, values);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating task:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // DELETE /tasks/:id - Delete a task
-app.delete("/tasks/:id", (request, response) => {
-  const taskId = parseInt(request.params.id, 10);
-  const initialLength = tasks.length;
-  tasks = tasks.filter((t) => t.id !== taskId);
+app.delete("/tasks/:id", async (req, res) => {
+  const taskId = parseInt(req.params.id, 10);
 
-  if (tasks.length === initialLength) {
-    return response.status(404).json({ error: "Task not found" });
+  try {
+    const deleteQuery = `
+        DELETE FROM tasks
+        WHERE id = $1
+        RETURNING *;
+      `;
+    const values = [taskId];
+    const result = await pool.query(deleteQuery, values);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json({ message: "Task deleted successfully", task: result.rows[0] });
+  } catch (err) {
+    console.error("Error deleting task:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-  response.json({ message: "Task deleted successfully" });
 });
 
 // Start the server
