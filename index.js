@@ -45,21 +45,39 @@ const initializeDatabase = async () => {
 initializeDatabase();
 
 // GET /tasks - Get all tasks
-app.get("/tasks", (req, res) => {
-  res.json(tasks);
+app.get("/tasks", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM tasks ORDER BY id ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching tasks:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // POST /tasks - Add a new task
-app.post("/tasks", (request, response) => {
-  const { id, description, status } = request.body;
-  if (!id || !description || !status) {
-    return response
+app.post("/tasks", async (req, res) => {
+  const { description, status } = req.body;
+
+  if (!description || !status) {
+    return res
       .status(400)
-      .json({ error: "All fields (id, description, status) are required" });
+      .json({ error: "Description and status are required" });
   }
 
-  tasks.push({ id, description, status });
-  response.status(201).json({ message: "Task added successfully" });
+  try {
+    const insertQuery = `
+        INSERT INTO tasks (description, status)
+        VALUES ($1, $2)
+        RETURNING *;
+      `;
+    const values = [description, status];
+    const result = await pool.query(insertQuery, values);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Error adding task:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // PUT /tasks/:id - Update a task's status
