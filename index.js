@@ -5,7 +5,7 @@ const { Pool } = require("pg");
 
 app.use(express.json());
 
-// connection pool
+// Connection pool
 const pool = new Pool({
   user: "postgres",
   host: "localhost",
@@ -23,10 +23,26 @@ pool.query("SELECT NOW()", (err, res) => {
   }
 });
 
-let tasks = [
-  { id: 1, description: "Buy groceries", status: "incomplete" },
-  { id: 2, description: "Read a book", status: "complete" },
-];
+// Function to initialize the database
+const initializeDatabase = async () => {
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS tasks (
+      id SERIAL PRIMARY KEY,
+      description VARCHAR(255) NOT NULL,
+      status VARCHAR(50) NOT NULL
+    );
+  `;
+
+  try {
+    await pool.query(createTableQuery);
+    console.log("Tasks table initialized or already exists.");
+  } catch (err) {
+    console.error("Error initializing database:", err);
+  }
+};
+
+// Call the initialization function
+initializeDatabase();
 
 // GET /tasks - Get all tasks
 app.get("/tasks", (req, res) => {
@@ -71,6 +87,7 @@ app.delete("/tasks/:id", (request, response) => {
   response.json({ message: "Task deleted successfully" });
 });
 
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
